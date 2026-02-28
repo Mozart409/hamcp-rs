@@ -6,7 +6,7 @@ default:
     just --choose
     
 inspector: clear
-    npx @modelcontextprotocol/inspector
+    npx @modelcontextprotocol/inspector http://localhost:3000/mcp
 
 clear:
     clear
