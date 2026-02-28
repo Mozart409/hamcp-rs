@@ -18,6 +18,7 @@ use rmcp::{
         StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
     },
 };
+use serde::Serialize;
 use tracing::info;
 
 use mcp::models::inputs::{
@@ -52,6 +53,13 @@ impl HomeAssistantServer {
     }
 }
 
+/// Serializes a value to pretty-printed JSON.
+///
+/// Returns an error string if serialization fails.
+fn to_json<T: Serialize>(value: &T) -> Result<String, String> {
+    serde_json::to_string_pretty(value).map_err(|e| format!("JSON serialization error: {e}"))
+}
+
 #[tool_router]
 impl HomeAssistantServer {
     /// Checks if the Home Assistant API is running and healthy.
@@ -59,16 +67,20 @@ impl HomeAssistantServer {
         name = "health_check",
         description = "Check if the Home Assistant API is running and healthy"
     )]
-    async fn health_check_tool(&self) -> String {
-        match self.client.check_health().await {
-            Ok(result) => {
-                if result.healthy {
-                    format!("Home Assistant API is healthy: {}", result.message)
-                } else {
-                    format!("Home Assistant API is unhealthy: {}", result.message)
-                }
-            }
-            Err(e) => e.to_string(),
+    async fn health_check_tool(&self) -> Result<String, String> {
+        let result = self
+            .client
+            .check_health()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if result.healthy {
+            Ok(format!("Home Assistant API is healthy: {}", result.message))
+        } else {
+            Err(format!(
+                "Home Assistant API is unhealthy: {}",
+                result.message
+            ))
         }
     }
 
@@ -77,12 +89,9 @@ impl HomeAssistantServer {
         name = "get_config",
         description = "Get Home Assistant configuration including location, unit system, and loaded components"
     )]
-    async fn get_config_tool(&self) -> String {
-        match self.client.get_config().await {
-            Ok(config) => serde_json::to_string_pretty(&config)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+    async fn get_config_tool(&self) -> Result<String, String> {
+        let config = self.client.get_config().await.map_err(|e| e.to_string())?;
+        to_json(&config)
     }
 
     /// Gets all entity states.
@@ -90,12 +99,9 @@ impl HomeAssistantServer {
         name = "get_states",
         description = "Get all Home Assistant entity states including lights, sensors, switches, etc."
     )]
-    async fn get_states_tool(&self) -> String {
-        match self.client.get_states().await {
-            Ok(states) => serde_json::to_string_pretty(&states)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+    async fn get_states_tool(&self) -> Result<String, String> {
+        let states = self.client.get_states().await.map_err(|e| e.to_string())?;
+        to_json(&states)
     }
 
     /// Gets a specific entity's state.
@@ -103,12 +109,16 @@ impl HomeAssistantServer {
         name = "get_entity",
         description = "Get the current state of a specific Home Assistant entity by ID"
     )]
-    async fn get_entity_tool(&self, Parameters(input): Parameters<GetEntityInput>) -> String {
-        match self.client.get_entity(&input.entity_id).await {
-            Ok(state) => serde_json::to_string_pretty(&state)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+    async fn get_entity_tool(
+        &self,
+        Parameters(input): Parameters<GetEntityInput>,
+    ) -> Result<String, String> {
+        let state = self
+            .client
+            .get_entity(&input.entity_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        to_json(&state)
     }
 
     /// Calls a Home Assistant service.
@@ -116,8 +126,11 @@ impl HomeAssistantServer {
         name = "call_service",
         description = "Call a Home Assistant service to control devices. Examples: domain='light', service='turn_on', entity_id='light.living_room'"
     )]
-    async fn call_service_tool(&self, Parameters(input): Parameters<CallServiceInput>) -> String {
-        match self
+    async fn call_service_tool(
+        &self,
+        Parameters(input): Parameters<CallServiceInput>,
+    ) -> Result<String, String> {
+        let response = self
             .client
             .call_service(
                 &input.domain,
@@ -127,14 +140,8 @@ impl HomeAssistantServer {
                 false,
             )
             .await
-        {
-            Ok(response) => serde_json::to_string_pretty(&response)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => format!(
-                "Failed to call service {}.{}: {e}",
-                input.domain, input.service
-            ),
-        }
+            .map_err(|e| format!("Failed to call {}.{}: {e}", input.domain, input.service))?;
+        to_json(&response)
     }
 
     /// Sets an entity state.
@@ -142,16 +149,20 @@ impl HomeAssistantServer {
         name = "set_state",
         description = "Set or update a state for a Home Assistant entity. Creates the entity if it doesn't exist."
     )]
-    async fn set_state_tool(&self, Parameters(input): Parameters<SetStateInput>) -> String {
+    async fn set_state_tool(
+        &self,
+        Parameters(input): Parameters<SetStateInput>,
+    ) -> Result<String, String> {
         let state_update = mcp::models::StateUpdate {
             state: input.state,
             attributes: input.attributes,
         };
-        match self.client.set_state(&input.entity_id, &state_update).await {
-            Ok(state) => serde_json::to_string_pretty(&state)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+        let state = self
+            .client
+            .set_state(&input.entity_id, &state_update)
+            .await
+            .map_err(|e| e.to_string())?;
+        to_json(&state)
     }
 
     /// Gets all available services.
@@ -159,12 +170,13 @@ impl HomeAssistantServer {
         name = "get_services",
         description = "Get all available Home Assistant services grouped by domain"
     )]
-    async fn get_services_tool(&self) -> String {
-        match self.client.get_services().await {
-            Ok(services) => serde_json::to_string_pretty(&services)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+    async fn get_services_tool(&self) -> Result<String, String> {
+        let services = self
+            .client
+            .get_services()
+            .await
+            .map_err(|e| e.to_string())?;
+        to_json(&services)
     }
 
     /// Renders a Home Assistant template.
@@ -175,11 +187,11 @@ impl HomeAssistantServer {
     async fn render_template_tool(
         &self,
         Parameters(input): Parameters<RenderTemplateInput>,
-    ) -> String {
-        match self.client.render_template(&input.template).await {
-            Ok(result) => result,
-            Err(e) => e.to_string(),
-        }
+    ) -> Result<String, String> {
+        self.client
+            .render_template(&input.template)
+            .await
+            .map_err(|e| e.to_string())
     }
 
     /// Gets all calendars.
@@ -187,12 +199,13 @@ impl HomeAssistantServer {
         name = "get_calendars",
         description = "Get all available calendar entities"
     )]
-    async fn get_calendars_tool(&self) -> String {
-        match self.client.get_calendars().await {
-            Ok(calendars) => serde_json::to_string_pretty(&calendars)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+    async fn get_calendars_tool(&self) -> Result<String, String> {
+        let calendars = self
+            .client
+            .get_calendars()
+            .await
+            .map_err(|e| e.to_string())?;
+        to_json(&calendars)
     }
 
     /// Gets calendar events.
@@ -203,16 +216,13 @@ impl HomeAssistantServer {
     async fn get_calendar_events_tool(
         &self,
         Parameters(input): Parameters<GetCalendarEventsInput>,
-    ) -> String {
-        match self
+    ) -> Result<String, String> {
+        let events = self
             .client
             .get_calendar_events(&input.entity_id, &input.start, &input.end)
             .await
-        {
-            Ok(events) => serde_json::to_string_pretty(&events)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+            .map_err(|e| e.to_string())?;
+        to_json(&events)
     }
 
     /// Checks Home Assistant configuration.
@@ -220,12 +230,13 @@ impl HomeAssistantServer {
         name = "check_config",
         description = "Validate the Home Assistant configuration.yaml file"
     )]
-    async fn check_config_tool(&self) -> String {
-        match self.client.check_config().await {
-            Ok(result) => serde_json::to_string_pretty(&result)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+    async fn check_config_tool(&self) -> Result<String, String> {
+        let result = self
+            .client
+            .check_config()
+            .await
+            .map_err(|e| e.to_string())?;
+        to_json(&result)
     }
 
     /// Gets entity history.
@@ -233,8 +244,11 @@ impl HomeAssistantServer {
         name = "get_history",
         description = "Get historical state data for one or more entities within a time range"
     )]
-    async fn get_history_tool(&self, Parameters(input): Parameters<GetHistoryInput>) -> String {
-        match self
+    async fn get_history_tool(
+        &self,
+        Parameters(input): Parameters<GetHistoryInput>,
+    ) -> Result<String, String> {
+        let history = self
             .client
             .get_history(
                 &input.entity_ids,
@@ -244,11 +258,8 @@ impl HomeAssistantServer {
                 input.no_attributes,
             )
             .await
-        {
-            Ok(history) => serde_json::to_string_pretty(&history)
-                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
-            Err(e) => e.to_string(),
-        }
+            .map_err(|e| e.to_string())?;
+        to_json(&history)
     }
 }
 
