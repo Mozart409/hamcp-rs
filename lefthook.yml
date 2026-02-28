@@ -6,11 +6,14 @@ pre-commit:
     - name: format
       glob: "*.rs"
       run: cargo fmt
+      stage_fixed: true
     - name: clippy
       glob: "*.rs"
       run: cargo clippy --all-targets -- -D warnings
+      stage_fixed: true
     - name: typos
       run: typos
+      stage_fixed: true
 pre-push:
   parallel: true
   jobs:

@@ -45,6 +45,7 @@
           sqlx-cli
           opencode
           typos
+          nodejs_24
         ];
         shellHook = ''
           lefthook install
