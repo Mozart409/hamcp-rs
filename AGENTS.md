@@ -213,8 +213,20 @@ The MCP server is built using the `rmcp` library with the following components:
 
 - **Transport**: Streamable HTTP server (`StreamableHttpService`) with `LocalSessionManager`
 - **Tools**: Defined using `#[tool_router]` macro on the `HomeAssistantServer` struct
+- **HTTP Client**: Cached `reqwest::Client` with connection pooling (10s timeout)
 - **Current Tools**:
   - `health_check`: Validates Home Assistant API is running at `/api/`
+  - `get_config`: Gets Home Assistant configuration
+  - `get_states`: Gets all entity states
+  - `get_entity`: Gets a specific entity's state
+  - `call_service`: Calls a Home Assistant service
+  - `set_state`: Sets or updates an entity state
+  - `get_services`: Gets all available services
+  - `render_template`: Renders a Home Assistant template
+  - `get_calendars`: Gets all calendar entities
+  - `get_calendar_events`: Gets events from a calendar
+  - `check_config`: Validates Home Assistant configuration
+  - `get_history`: Gets historical state data
 
 ### Environment Variables
 
@@ -223,6 +235,8 @@ Required environment variables (see `.env.example`):
 ```bash
 HA_URL=http://homeassistant:8123    # Home Assistant instance URL
 HA_TOKEN=your_token                  # Long-lived access token
+# Optional
+MCP_ADDR=0.0.0.0:3000               # Server bind address (default: 0.0.0.0:3000)
 ```
 
 ### Running the MCP Server
@@ -292,8 +306,10 @@ hamcp-rs/
 │   ├── Cargo.toml
 │   └── src/
 │       ├── main.rs     # MCP server with streamable HTTP transport
-        ├── lib.rs      # Library exports
-        ├── rest/       # REST API client
-        ├── websocket/  # WebSocket API client
-        └── models/     # Data models
+│       ├── lib.rs      # Library exports
+│       ├── rest/       # REST API client (cached HTTP client with connection pooling)
+│       ├── websocket/  # WebSocket API client
+│       └── models/     # Data models
+│           ├── mod.rs      # API response types
+│           └── inputs.rs   # MCP tool input types
 ```

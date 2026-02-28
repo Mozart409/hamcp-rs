@@ -1,3 +1,10 @@
+//! Data models for Home Assistant API responses.
+//!
+//! This module contains all the data structures used for serializing
+//! and deserializing Home Assistant API responses.
+
+pub mod inputs;
+
 use std::collections::HashMap;
 
 use rmcp::schemars;

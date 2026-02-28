@@ -1,4 +1,11 @@
-use std::{collections::HashMap, env};
+//! MCP server for Home Assistant integration.
+//!
+//! This binary provides an MCP (Model Context Protocol) server that exposes
+//! Home Assistant functionality as tools for AI assistants.
+
+use std::env;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::Router;
 use color_eyre::eyre::{Context, Result};
@@ -6,15 +13,21 @@ use rmcp::{
     ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{Implementation, ServerCapabilities, ServerInfo},
-    schemars, tool, tool_handler, tool_router,
+    tool, tool_handler, tool_router,
     transport::streamable_http_server::{
         StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
     },
 };
-use serde::Deserialize;
 use tracing::info;
 
+use mcp::models::inputs::{
+    CallServiceInput, GetCalendarEventsInput, GetEntityInput, GetHistoryInput, RenderTemplateInput,
+    SetStateInput,
+};
 use mcp::rest::HomeAssistantClient;
+
+/// Default server address.
+const DEFAULT_ADDR: &str = "0.0.0.0:3000";
 
 /// MCP server for Home Assistant integration.
 #[derive(Debug, Clone)]
@@ -30,85 +43,13 @@ impl HomeAssistantServer {
     ///
     /// # Arguments
     ///
-    /// * `ha_url` - The base URL of the Home Assistant instance
-    /// * `ha_token` - The long-lived access token for authentication
-    fn new(ha_url: String, ha_token: String) -> Self {
+    /// * `client` - The Home Assistant API client
+    fn new(client: HomeAssistantClient) -> Self {
         Self {
-            client: HomeAssistantClient::new(ha_url, ha_token),
+            client,
             tool_router: Self::tool_router(),
         }
     }
-}
-
-/// Input for the get_entity tool.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct GetEntityInput {
-    /// The entity ID (e.g., "light.living_room")
-    entity_id: String,
-}
-
-/// Input for the call_service tool.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct CallServiceInput {
-    /// The service domain (e.g., "light", "switch", "climate")
-    domain: String,
-    /// The service name (e.g., "turn_on", "turn_off", "set_temperature")
-    service: String,
-    /// Optional entity ID to target (e.g., "light.living_room")
-    #[serde(default)]
-    entity_id: Option<String>,
-    /// Optional service data parameters (e.g., {"brightness": 255})
-    #[serde(default)]
-    service_data: Option<HashMap<String, serde_json::Value>>,
-}
-
-/// Input for the set_state tool.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct SetStateInput {
-    /// The entity ID (e.g., "sensor.custom_sensor")
-    entity_id: String,
-    /// The state value to set
-    state: String,
-    /// Optional attributes
-    #[serde(default)]
-    attributes: Option<HashMap<String, serde_json::Value>>,
-}
-
-/// Input for the render_template tool.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct RenderTemplateInput {
-    /// The template string to render (e.g., "The temperature is {{ states('sensor.temperature') }}C")
-    template: String,
-}
-
-/// Input for the get_calendar_events tool.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct GetCalendarEventsInput {
-    /// The calendar entity ID (e.g., "calendar.personal")
-    entity_id: String,
-    /// Start time in ISO 8601 format (e.g., "2024-01-01T00:00:00")
-    start: String,
-    /// End time in ISO 8601 format (e.g., "2024-12-31T23:59:59")
-    end: String,
-}
-
-/// Input for the get_history tool.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct GetHistoryInput {
-    /// Entity IDs to fetch history for (e.g., ["sensor.temperature"])
-    entity_ids: Vec<String>,
-    /// Optional start time in ISO 8601 format
-    #[serde(default)]
-    start_time: Option<String>,
-    /// Optional end time in ISO 8601 format
-    #[serde(default)]
-    end_time: Option<String>,
-    /// Return only changed states (faster, default: false)
-    #[serde(default)]
-    minimal_response: bool,
-    /// Skip returning attributes (faster, default: false)
-    #[serde(default)]
-    no_attributes: bool,
 }
 
 #[tool_router]
@@ -138,10 +79,8 @@ impl HomeAssistantServer {
     )]
     async fn get_config_tool(&self) -> String {
         match self.client.get_config().await {
-            Ok(config) => match serde_json::to_string_pretty(&config) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(config) => serde_json::to_string_pretty(&config)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -153,10 +92,8 @@ impl HomeAssistantServer {
     )]
     async fn get_states_tool(&self) -> String {
         match self.client.get_states().await {
-            Ok(states) => match serde_json::to_string_pretty(&states) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(states) => serde_json::to_string_pretty(&states)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -168,10 +105,8 @@ impl HomeAssistantServer {
     )]
     async fn get_entity_tool(&self, Parameters(input): Parameters<GetEntityInput>) -> String {
         match self.client.get_entity(&input.entity_id).await {
-            Ok(state) => match serde_json::to_string_pretty(&state) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(state) => serde_json::to_string_pretty(&state)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -193,10 +128,8 @@ impl HomeAssistantServer {
             )
             .await
         {
-            Ok(response) => match serde_json::to_string_pretty(&response) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(response) => serde_json::to_string_pretty(&response)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => format!(
                 "Failed to call service {}.{}: {e}",
                 input.domain, input.service
@@ -215,10 +148,8 @@ impl HomeAssistantServer {
             attributes: input.attributes,
         };
         match self.client.set_state(&input.entity_id, &state_update).await {
-            Ok(state) => match serde_json::to_string_pretty(&state) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(state) => serde_json::to_string_pretty(&state)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -230,10 +161,8 @@ impl HomeAssistantServer {
     )]
     async fn get_services_tool(&self) -> String {
         match self.client.get_services().await {
-            Ok(services) => match serde_json::to_string_pretty(&services) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(services) => serde_json::to_string_pretty(&services)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -260,10 +189,8 @@ impl HomeAssistantServer {
     )]
     async fn get_calendars_tool(&self) -> String {
         match self.client.get_calendars().await {
-            Ok(calendars) => match serde_json::to_string_pretty(&calendars) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(calendars) => serde_json::to_string_pretty(&calendars)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -282,10 +209,8 @@ impl HomeAssistantServer {
             .get_calendar_events(&input.entity_id, &input.start, &input.end)
             .await
         {
-            Ok(events) => match serde_json::to_string_pretty(&events) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(events) => serde_json::to_string_pretty(&events)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -297,10 +222,8 @@ impl HomeAssistantServer {
     )]
     async fn check_config_tool(&self) -> String {
         match self.client.check_config().await {
-            Ok(result) => match serde_json::to_string_pretty(&result) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(result) => serde_json::to_string_pretty(&result)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -322,10 +245,8 @@ impl HomeAssistantServer {
             )
             .await
         {
-            Ok(history) => match serde_json::to_string_pretty(&history) {
-                Ok(json) => json,
-                Err(e) => format!("JSON serialization error: {e}"),
-            },
+            Ok(history) => serde_json::to_string_pretty(&history)
+                .unwrap_or_else(|e| format!("JSON serialization error: {e}")),
             Err(e) => e.to_string(),
         }
     }
@@ -359,31 +280,50 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".to_string().into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
     let ha_url = env::var("HA_URL").context("HA_URL environment variable is required")?;
     let ha_token = env::var("HA_TOKEN").context("HA_TOKEN environment variable is required")?;
 
+    let addr: SocketAddr = env::var("MCP_ADDR")
+        .unwrap_or_else(|_| DEFAULT_ADDR.to_string())
+        .parse()
+        .context("Invalid MCP_ADDR format - expected socket address like 0.0.0.0:3000")?;
+
     info!("Starting Home Assistant MCP server...");
     info!("Home Assistant URL: {ha_url}");
 
+    // Create a shared client that will be cloned for each session
+    let client = Arc::new(
+        HomeAssistantClient::new(&ha_url, &ha_token)
+            .context("Failed to create Home Assistant client")?,
+    );
+
     let service = StreamableHttpService::new(
-        move || Ok(HomeAssistantServer::new(ha_url.clone(), ha_token.clone())),
+        move || {
+            let client = (*client).clone();
+            Ok(HomeAssistantServer::new(client))
+        },
         LocalSessionManager::default().into(),
         StreamableHttpServerConfig::default(),
     );
 
     let app = Router::new().nest_service("/mcp", service);
 
-    let addr: &str = "0.0.0.0:3000";
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .with_context(|| format!("Failed to bind to {addr}"))?;
+
     info!("MCP server listening on {addr}");
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(async { tokio::signal::ctrl_c().await.unwrap() })
+        .with_graceful_shutdown(async {
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to listen for ctrl-c signal");
+        })
         .await?;
 
     Ok(())

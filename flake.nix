@@ -1,5 +1,5 @@
 {
-  description = "Development environment for axon-gateway";
+  description = "Development environment for hamcp-rs";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
