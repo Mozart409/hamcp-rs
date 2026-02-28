@@ -126,23 +126,24 @@ use crate::websocket::Client;
 
 ### Error Handling
 
-- Use `thiserror` or `color_eyre` for error types
+- Use `color-eyre` for error types
 - Prefer `Result<T, E>` over panics
 - Use `?` operator liberally
-- Create custom error types for domain-specific errors
 - Include context with errors when propagating
 
 ```rust
-use thiserror::Error;
+use color_eyre::eyre::{Context, Result};
 
-#[derive(Error, Debug)]
-pub enum HomeAssistantError {
-    #[error("Failed to connect to Home Assistant: {0}")]
-    ConnectionFailed(String),
-    #[error("Authentication failed")]
-    AuthenticationFailed,
-    #[error("Invalid response: {0}")]
-    InvalidResponse(#[from] serde_json::Error),
+async fn check_api_health(client: &Client, base_url: &str) -> Result<HealthStatus> {
+    let url = format!("{}/api/", base_url);
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .with_context(|| format!("Failed to connect to Home Assistant at {}", url))?;
+
+    // ... rest of implementation
 }
 ```
 
@@ -196,12 +197,47 @@ mod tests {
 
 ### MCP Server Specific
 
-- Follow MCP protocol specification for tools, resources, and prompts
+- Use `rmcp` crate for MCP protocol implementation
+- Implements `ServerHandler` trait with `#[tool_handler]` macro
+- Define tools with `#[tool_router]` and `#[tool]` macros
+- Streamable HTTP transport on port 3000 at `/mcp` endpoint
 - Use structured logging (`tracing` crate)
 - Implement graceful shutdown on SIGTERM/SIGINT
 - Validate all inputs from Home Assistant API
 - Handle WebSocket reconnections with exponential backoff
 - Keep authentication tokens secure (use environment variables)
+
+### MCP Server Architecture
+
+The MCP server is built using the `rmcp` library with the following components:
+
+- **Transport**: Streamable HTTP server (`StreamableHttpService`) with `LocalSessionManager`
+- **Tools**: Defined using `#[tool_router]` macro on the `HomeAssistantServer` struct
+- **Current Tools**:
+  - `health_check`: Validates Home Assistant API is running at `/api/`
+
+### Environment Variables
+
+Required environment variables (see `.env.example`):
+
+```bash
+HA_URL=http://homeassistant:8123    # Home Assistant instance URL
+HA_TOKEN=your_token                  # Long-lived access token
+```
+
+### Running the MCP Server
+
+```bash
+# With environment variables from .env file
+cargo run --bin mcp
+
+# With explicit environment variables
+HA_URL=http://homeassistant:8123 HA_TOKEN=token cargo run --bin mcp
+
+# Production build
+cargo build --release
+HA_URL=http://homeassistant:8123 HA_TOKEN=token ./target/release/mcp
+```
 
 ### MCP Inspector
 
@@ -209,10 +245,12 @@ The MCP Inspector is available in the dev environment via Node.js:
 
 ```bash
 # Run the MCP Inspector to test your server
-npx @modelcontextprotocol/inspector <command> [args]
+npx @modelcontextprotocol/inspector http://localhost:3000/mcp
 
-# Example with environment variables
-npx @modelcontextprotocol/inspector ./target/release/hamcp-rs
+# Test with specific environment (if running standalone)
+HA_URL=http://homeassistant:8123 \
+HA_TOKEN=your_token \
+npx @modelcontextprotocol/inspector ./target/release/mcp
 
 # For development builds with env vars
 HA_URL=http://homeassistant.local:8123 \
@@ -249,14 +287,13 @@ hamcp-rs/
 ├── bacon.toml          # Bacon configuration
 ├── lefthook.yml        # Git hooks configuration
 ├── flake.nix           # Nix dev environment
-├── mcp/                # MCP protocol crate
+├── .env.example        # Environment variables template
+├── mcp/                # MCP server crate (uses rmcp library)
 │   ├── Cargo.toml
 │   └── src/
-│       └── main.rs     # MCP server entry point
-└── src/                # Main crate - Home Assistant integration
-    ├── main.rs         # Entry point
-    ├── lib.rs          # Library exports
-    ├── rest/           # REST API client
-    ├── websocket/      # WebSocket API client
-    └── models/         # Data models
+│       ├── main.rs     # MCP server with streamable HTTP transport
+        ├── lib.rs      # Library exports
+        ├── rest/       # REST API client
+        ├── websocket/  # WebSocket API client
+        └── models/     # Data models
 ```
