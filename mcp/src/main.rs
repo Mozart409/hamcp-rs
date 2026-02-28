@@ -108,7 +108,10 @@ impl HomeAssistantServer {
 
 #[tool_router]
 impl HomeAssistantServer {
-    #[tool(name = "health_check", description = "Check if the Home Assistant API is running and healthy")]
+    #[tool(
+        name = "health_check",
+        description = "Check if the Home Assistant API is running and healthy"
+    )]
     async fn health_check_tool(&self) -> String {
         match self.check_api_health().await {
             Ok(result) => {
@@ -138,7 +141,9 @@ impl ServerHandler for HomeAssistantServer {
                 icons: None,
                 website_url: None,
             },
-            instructions: Some("Home Assistant MCP server for controlling your smart home".to_string()),
+            instructions: Some(
+                "Home Assistant MCP server for controlling your smart home".to_string(),
+            ),
         }
     }
 }
@@ -156,10 +161,8 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let ha_url = env::var("HA_URL")
-        .context("HA_URL environment variable is required")?;
-    let ha_token = env::var("HA_TOKEN")
-        .context("HA_TOKEN environment variable is required")?;
+    let ha_url = env::var("HA_URL").context("HA_URL environment variable is required")?;
+    let ha_token = env::var("HA_TOKEN").context("HA_TOKEN environment variable is required")?;
 
     info!("Starting Home Assistant MCP server...");
     info!("Home Assistant URL: {}", ha_url);
@@ -171,7 +174,7 @@ async fn main() -> Result<()> {
     );
 
     let app = Router::new().nest_service("/mcp", service);
-    
+
     let addr: &str = "0.0.0.0:3000";
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("MCP server listening on {}", addr);
