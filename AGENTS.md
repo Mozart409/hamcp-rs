@@ -86,6 +86,73 @@ nix develop
 direnv allow
 ```
 
+## Nix Build & Release
+
+The flake uses [crane](https://github.com/ipetkov/crane) with rust-overlay to build the project. Crane
+caches dependency builds separately from the application, so incremental rebuilds are fast.
+
+```bash
+# Build the mcp binary
+nix build .#mcp
+
+# Run directly without installing
+nix run .#mcp
+
+# Build and inspect the result
+nix build .#mcp && ls -la result/bin/mcp
+```
+
+### Flake Outputs
+
+- `packages.<system>.default` / `packages.<system>.mcp` -- release build of the mcp binary
+- `devShells.<system>.default` -- development environment with all tooling
+- `nixosModules.default` -- NixOS service module for deployment
+
+### NixOS Module
+
+The flake exports a NixOS module at `nixosModules.default` for declarative deployment. It creates a
+hardened systemd service with `DynamicUser`, `LoadCredential` (token never enters the Nix store), and
+full security sandboxing.
+
+**Module options** (`services.hamcp`):
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `enable` | bool | `false` | Enable the hamcp service |
+| `package` | package | `self.packages` | The hamcp package to use |
+| `haUrl` | str | (required) | Home Assistant instance URL |
+| `haTokenFile` | path | (required) | Path to file containing HA long-lived access token |
+| `port` | port | `3000` | Listen port |
+| `address` | str | `"0.0.0.0"` | Bind address |
+| `openFirewall` | bool | `false` | Open the port in the NixOS firewall |
+
+**Colmena deployment example:**
+
+```nix
+# In your Colmena hive flake
+{
+  inputs.hamcp.url = "github:youruser/hamcp-rs";
+
+  outputs = { hamcp, ... }: {
+    colmena = {
+      your-vm = {
+        imports = [ hamcp.nixosModules.default ];
+        services.hamcp = {
+          enable = true;
+          haUrl = "http://homeassistant.local:8123";
+          haTokenFile = config.sops.secrets.ha-token.path; # or agenix
+          port = 3000;
+          openFirewall = true;
+        };
+      };
+    };
+  };
+}
+```
+
+The secret file (`haTokenFile`) should contain only the raw token string. It is loaded at runtime
+via systemd `LoadCredential`, so it works with sops-nix, agenix, or any file-based secret manager.
+
 ## Code Style Guidelines
 
 ### General
