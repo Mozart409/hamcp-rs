@@ -8,20 +8,20 @@ allowing AI assistants to interact with your smart home.
 
 ## Tools
 
-| Tool | Description |
-|---|---|
-| `health_check` | Validate the Home Assistant API is reachable |
-| `get_config` | Get Home Assistant configuration |
-| `get_states` | Get all entity states |
-| `get_entity` | Get a specific entity's state |
-| `call_service` | Call a Home Assistant service |
-| `set_state` | Set or update an entity state |
-| `get_services` | Get all available services |
-| `render_template` | Render a Home Assistant template |
-| `get_calendars` | Get all calendar entities |
-| `get_calendar_events` | Get events from a calendar |
-| `check_config` | Validate Home Assistant configuration |
-| `get_history` | Get historical state data |
+| Tool                  | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `health_check`        | Validate the Home Assistant API is reachable |
+| `get_config`          | Get Home Assistant configuration             |
+| `get_states`          | Get all entity states                        |
+| `get_entity`          | Get a specific entity's state                |
+| `call_service`        | Call a Home Assistant service                |
+| `set_state`           | Set or update an entity state                |
+| `get_services`        | Get all available services                   |
+| `render_template`     | Render a Home Assistant template             |
+| `get_calendars`       | Get all calendar entities                    |
+| `get_calendar_events` | Get events from a calendar                   |
+| `check_config`        | Validate Home Assistant configuration        |
+| `get_history`         | Get historical state data                    |
 
 ## Prerequisites
 
@@ -54,11 +54,11 @@ cargo build --release
 
 ### Environment Variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `HA_URL` | Yes | -- | Home Assistant instance URL (e.g. `http://homeassistant:8123`) |
-| `HA_TOKEN` | Yes | -- | Long-lived access token |
-| `MCP_ADDR` | No | `0.0.0.0:3000` | Server bind address and port |
+| Variable   | Required | Default        | Description                                                    |
+| ---------- | -------- | -------------- | -------------------------------------------------------------- |
+| `HA_URL`   | Yes      | --             | Home Assistant instance URL (e.g. `http://homeassistant:8123`) |
+| `HA_TOKEN` | Yes      | --             | Long-lived access token                                        |
+| `MCP_ADDR` | No       | `0.0.0.0:3000` | Server bind address and port                                   |
 
 Copy `.env.example` to `.env` for local development:
 
@@ -79,7 +79,7 @@ Add hamcp-rs as a flake input in your deployment:
 
 ```nix
 {
-  inputs.hamcp.url = "github:youruser/hamcp-rs";
+  inputs.hamcp.url = "github:mozart409/hamcp-rs";
 
   outputs = { hamcp, ... }: {
     colmena = {
@@ -101,15 +101,15 @@ Add hamcp-rs as a flake input in your deployment:
 
 #### Module Options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `enable` | bool | `false` | Enable the hamcp service |
-| `package` | package | `self.packages` | The hamcp package to use |
-| `haUrl` | str | (required) | Home Assistant instance URL |
-| `haTokenFile` | path | (required) | Path to file containing the HA access token |
-| `port` | port | `3000` | Listen port |
-| `address` | str | `"0.0.0.0"` | Bind address |
-| `openFirewall` | bool | `false` | Open the port in the NixOS firewall |
+| Option         | Type    | Default         | Description                                 |
+| -------------- | ------- | --------------- | ------------------------------------------- |
+| `enable`       | bool    | `false`         | Enable the hamcp service                    |
+| `package`      | package | `self.packages` | The hamcp package to use                    |
+| `haUrl`        | str     | (required)      | Home Assistant instance URL                 |
+| `haTokenFile`  | path    | (required)      | Path to file containing the HA access token |
+| `port`         | port    | `3000`          | Listen port                                 |
+| `address`      | str     | `"0.0.0.0"`     | Bind address                                |
+| `openFirewall` | bool    | `false`         | Open the port in the NixOS firewall         |
 
 The `haTokenFile` should contain only the raw token string. It is loaded at runtime via
 systemd `LoadCredential`, so it works with sops-nix, agenix, or any file-based secret manager.
