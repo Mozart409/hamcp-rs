@@ -22,6 +22,9 @@ pre-commit:
       glob: "flake.nix"
       run: keep-sorted flake.nix
       stage_fixed: true
+    - name: cargo-deny
+      glob: "Cargo.{toml,lock}"
+      run: cargo deny check
 pre-push:
   parallel: true
   jobs:
