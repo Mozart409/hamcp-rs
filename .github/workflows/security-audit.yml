@@ -1,0 +1,45 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Run daily at midnight
+    - cron: '0 0 * * *'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  push:
+    branches: [main]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cargo-deny-checks:
+    name: Cargo Deny Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Check advisories
+        run: nix develop --command cargo-deny check advisories
+
+      - name: Check bans
+        run: nix develop --command cargo-deny check bans
+
+      - name: Check licenses
+        run: nix develop --command cargo-deny check licenses
+
+      - name: Check sources
+        run: nix develop --command cargo-deny check sources

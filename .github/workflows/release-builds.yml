@@ -1,0 +1,105 @@
+name: Release Builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    name: Build - Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build release binary
+        run: nix build .#mcp
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifacts
+          cp result/bin/mcp artifacts/hamcp-linux-x86_64
+          chmod +x artifacts/hamcp-linux-x86_64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamcp-linux-x86_64
+          path: artifacts/hamcp-linux-x86_64
+          retention-days: 30
+
+  build-macos:
+    name: Build - macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build release binary
+        run: nix build .#mcp
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifacts
+          cp result/bin/mcp artifacts/hamcp-macos-aarch64
+          chmod +x artifacts/hamcp-macos-aarch64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamcp-macos-aarch64
+          path: artifacts/hamcp-macos-aarch64
+          retention-days: 30
+
+  release:
+    name: Create Release
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hamcp-linux-x86_64
+          path: artifacts/
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hamcp-macos-aarch64
+          path: artifacts/
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          sha256sum ./* > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/hamcp-linux-x86_64
+            artifacts/hamcp-macos-aarch64
+            artifacts/checksums.txt
+          generate_release_notes: true
