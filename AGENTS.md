@@ -2,6 +2,88 @@
 
 MCP (Model Context Protocol) server for Home Assistant built in Rust.
 
+## CI/CD Workflows
+
+This project uses GitHub Actions for continuous integration and deployment. All workflows are defined in `.github/workflows/`.
+
+### PR Checks (`pr-checks.yml`)
+
+Runs on every pull request and push to main:
+
+- **fmt**: Checks code formatting with `cargo fmt --check`
+- **clippy**: Runs clippy lints with `-D warnings` and pedantic mode
+- **test**: Runs all tests with `cargo test --all-targets`
+- **typos**: Checks for typos using the `typos` tool
+- **actionlint**: Lints GitHub Actions workflow files
+
+### Nix Build (`nix-build.yml`)
+
+Validates Nix flake builds:
+
+- **build**: Builds the `mcp` package using Nix
+- **flake-check**: Runs `nix flake check` to verify flake integrity
+
+### Security Audit (`security-audit.yml`)
+
+Runs daily and on dependency changes:
+
+- **audit**: Runs `cargo-deny check` to scan for security advisories
+- **cargo-deny-checks**: Separate checks for advisories, bans, licenses, and sources
+
+### Release Builds (`release-builds.yml`)
+
+Triggered on version tags (`v*`):
+
+- **build-linux**: Builds x86_64 Linux binary
+- **build-macos**: Builds universal macOS binary
+- **release**: Creates GitHub release with binaries and checksums
+
+### NixOS Module Tests (`nixos-module.yml`)
+
+Validates the NixOS module:
+
+- **eval**: Evaluates the NixOS module for correctness
+- **module-options**: Tests module options with a minimal configuration
+
+### Docker Image (`docker.yml`)
+
+Builds and publishes container images:
+
+- **build**: Builds Docker image using Docker Buildx
+- **build-nix**: Alternative Nix-based OCI image build
+- Publishes to `ghcr.io` on pushes to main and tags
+
+### Conventional Commits (`conventional-commits.yml`)
+
+Enforces commit message format:
+
+- **check**: Uses `cog check` to verify commits
+- **verify-commits**: Validates all PR commits follow conventional format
+- **check-pr-title**: Ensures PR title follows format: `<type>[(scope)]: <description>`
+
+Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`, `perf`, `revert`
+
+### Documentation (`documentation.yml`)
+
+Builds and deploys rustdocs:
+
+- **build**: Builds documentation with `cargo doc --no-deps --all-features`
+- **deploy**: Deploys to GitHub Pages on main branch
+
+### Dependabot (`dependabot.yml`)
+
+Automated dependency updates:
+
+- **Cargo**: Weekly updates for Rust dependencies
+- **GitHub Actions**: Weekly updates for workflow actions
+- Creates PRs with `chore(deps)` prefix
+
+### Security
+
+- All workflows use DeterminateSystems Nix installer for reproducible builds
+- Docker images are scanned and pushed to GitHub Container Registry
+- Secrets are never logged or exposed in workflow outputs
+
 ## Home Assistant API Documentation
 
 - **REST API**: https://developers.home-assistant.io/docs/api/rest/
