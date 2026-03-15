@@ -77,6 +77,7 @@
           opencode
           typos
           nodejs_24
+          actionlint
         ];
         shellHook = ''
           lefthook install
