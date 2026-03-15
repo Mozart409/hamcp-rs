@@ -266,20 +266,12 @@ impl HomeAssistantServer {
 #[tool_handler]
 impl ServerHandler for HomeAssistantServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: rmcp::model::ProtocolVersion::V_2024_11_05,
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            server_info: Implementation {
-                name: "hamcp-rs".to_string(),
-                title: Some("Home Assistant MCP".to_string()),
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                icons: None,
-                website_url: None,
-            },
-            instructions: Some(
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_protocol_version(rmcp::model::ProtocolVersion::V_2024_11_05)
+            .with_server_info(Implementation::new("hamcp-rs", env!("CARGO_PKG_VERSION")))
+            .with_instructions(
                 "Home Assistant MCP server for controlling your smart home".to_string(),
-            ),
-        }
+            )
     }
 }
 

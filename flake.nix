@@ -79,6 +79,7 @@
           nodejs_24
           actionlint
           cargo-audit
+          cargo-outdated
         ];
         shellHook = ''
           lefthook install
