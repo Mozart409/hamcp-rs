@@ -1,5 +1,6 @@
 services:
   hamcp:
+    container_name: hamcp-rs
     build:
       context: .
       dockerfile: Dockerfile
