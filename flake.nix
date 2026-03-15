@@ -78,6 +78,7 @@
           typos
           nodejs_24
           actionlint
+          cargo-audit
         ];
         shellHook = ''
           lefthook install
