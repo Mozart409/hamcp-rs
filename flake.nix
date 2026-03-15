@@ -58,28 +58,31 @@
 
       devShells.default = pkgs.mkShell {
         buildInputs = with pkgs; [
-          rust
-          lazydocker
+          # keep-sorted start
+          actionlint
           bacon
+          cargo-audit
           cargo-deny
-          lefthook
-          cocogitto
-          just
+          cargo-outdated
           cargo-workspaces
-          opentofu
+          cocogitto
           dbeaver-bin
-          postgresql_16
-          tailwindcss_4
           docker
           docker-buildx
           docker-compose
-          sqlx-cli
-          opencode
-          typos
+          just
+          keep-sorted
+          lazydocker
+          lefthook
           nodejs_24
-          actionlint
-          cargo-audit
-          cargo-outdated
+          opencode
+          opentofu
+          postgresql_16
+          rust
+          sqlx-cli
+          tailwindcss_4
+          typos
+          # keep-sorted end
         ];
         shellHook = ''
           lefthook install
