@@ -33,7 +33,7 @@ jobs:
           chmod +x artifacts/hamcp-linux-x86_64
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hamcp-linux-x86_64
           path: artifacts/hamcp-linux-x86_64
@@ -61,7 +61,7 @@ jobs:
           chmod +x artifacts/hamcp-macos-aarch64
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hamcp-macos-aarch64
           path: artifacts/hamcp-macos-aarch64
