@@ -18,6 +18,10 @@ pre-commit:
       glob: ".github/workflows/*.{yml,yaml}"
       run: actionlint
       stage_fixed: true
+    - name: keep-sorted
+      glob: "flake.nix"
+      run: keep-sorted --prefix='# BEGIN keep-sorted' --suffix='# END keep-sorted' flake.nix
+      stage_fixed: true
 pre-push:
   parallel: true
   jobs:
