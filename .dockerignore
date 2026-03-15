@@ -1,0 +1,31 @@
+# Build artifacts
+target/
+
+# Version control
+.git/
+.gitignore
+
+# Nix
+.direnv/
+result
+result-*
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# CI / config not needed in image
+.github/
+.env
+.env.*
+!.env.example
+lefthook.yml
+bacon.toml
+flake.nix
+flake.lock
+*.md
+*.nix
+!mcp/**
+LICENSE

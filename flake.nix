@@ -81,6 +81,7 @@
           rust
           sqlx-cli
           tailwindcss_4
+          trivy
           typos
           # keep-sorted end
         ];

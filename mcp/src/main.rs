@@ -7,7 +7,7 @@ use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::Router;
+use axum::{Json, Router, routing::get};
 use color_eyre::eyre::{Context, Result};
 use rmcp::{
     ServerHandler,
@@ -277,6 +277,12 @@ impl ServerHandler for HomeAssistantServer {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Handle --healthcheck flag for Docker HEALTHCHECK in scratch images.
+    // This avoids the need for curl/wget in the container.
+    if env::args().any(|a| a == "--healthcheck") {
+        return run_healthcheck().await;
+    }
+
     dotenvy::dotenv().ok();
 
     color_eyre::install()?;
@@ -313,7 +319,10 @@ async fn main() -> Result<()> {
         StreamableHttpServerConfig::default(),
     );
 
-    let app = Router::new().nest_service("/mcp", service);
+    let app = Router::new()
+        .nest_service("/mcp", service)
+        .route("/_healthcheck", get(health_handler))
+        .route("/", get(health_handler));
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
@@ -330,4 +339,34 @@ async fn main() -> Result<()> {
         .await?;
 
     Ok(())
+}
+
+/// Performs an HTTP health check against the running server.
+///
+/// Used by Docker `HEALTHCHECK` in scratch images where curl/wget are unavailable.
+/// Exits with code 0 on success, 1 on failure.
+async fn run_healthcheck() -> Result<()> {
+    let addr = env::var("MCP_ADDR").unwrap_or_else(|_| DEFAULT_ADDR.to_string());
+    let url = format!("http://{addr}/_healthcheck");
+
+    let response = reqwest::get(&url)
+        .await
+        .with_context(|| format!("Health check request to {url} failed"))?;
+
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        std::process::exit(1);
+    }
+}
+
+/// Health check response body.
+#[derive(Serialize)]
+struct HealthcheckResponse {
+    status: &'static str,
+}
+
+/// Simple health check handler for container probes.
+async fn health_handler() -> Json<HealthcheckResponse> {
+    Json(HealthcheckResponse { status: "ok" })
 }
