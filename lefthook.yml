@@ -25,6 +25,10 @@ pre-commit:
     - name: cargo-deny
       glob: "Cargo.{toml,lock}"
       run: cargo deny check
+commit-msg:
+  jobs:
+    - name: cog verify
+      run: cog verify --file {1}
 pre-push:
   parallel: true
   jobs:

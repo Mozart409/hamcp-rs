@@ -87,7 +87,6 @@
         ];
         shellHook = ''
           lefthook install
-          cog install-hook
           export COMPOSE_BAKE=true
         '';
       };
