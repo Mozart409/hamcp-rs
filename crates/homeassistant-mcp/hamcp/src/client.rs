@@ -24,7 +24,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 10;
 /// This client maintains a persistent HTTP connection pool for efficient
 /// request handling. It is cheap to clone due to internal `Arc` usage.
 #[derive(Debug, Clone)]
-pub struct HomeAssistantClient {
+pub struct HaClient {
     /// Base URL of the Home Assistant instance.
     base_url: Url,
     /// Shared HTTP client with connection pooling.
@@ -76,7 +76,7 @@ pub enum ClientError {
 /// This is a convenience alias for `std::result::Result<T, ClientError>`.
 pub type Result<T> = std::result::Result<T, ClientError>;
 
-impl HomeAssistantClient {
+impl HaClient {
     /// Creates a new Home Assistant API client.
     ///
     /// The client maintains a persistent HTTP connection pool for efficient
@@ -94,13 +94,13 @@ impl HomeAssistantClient {
     /// # Example
     ///
     /// ```no_run
-    /// use mcp::rest::HomeAssistantClient;
+    /// use hamcp::client::HaClient;
     ///
-    /// let client = HomeAssistantClient::new(
+    /// let client = HaClient::new(
     ///     "http://homeassistant:8123",
     ///     "your_long_lived_access_token",
     /// )?;
-    /// # Ok::<(), mcp::rest::ClientError>(())
+    /// # Ok::<(), hamcp::client::ClientError>(())
     /// ```
     pub fn new(base_url: &str, token: &str) -> Result<Self> {
         let base_url = Url::parse(base_url)
@@ -471,7 +471,6 @@ impl HomeAssistantClient {
     ) -> Result<Vec<CalendarEvent>> {
         let mut url = self.api_url(&format!("/api/calendars/{entity_id}"))?;
 
-        // Properly URL-encode query parameters
         url.query_pairs_mut()
             .append_pair("start", start)
             .append_pair("end", end);
@@ -532,7 +531,6 @@ impl HomeAssistantClient {
 
         let mut url = self.api_url(&path)?;
 
-        // Build query parameters with proper URL encoding
         {
             let mut query = url.query_pairs_mut();
             query.append_pair("filter_entity_id", &entity_ids.join(","));
@@ -617,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_client_creation_valid() {
-        let client = HomeAssistantClient::new("http://localhost:8123", "test_token");
+        let client = HaClient::new("http://localhost:8123", "test_token");
         assert!(client.is_ok());
 
         let client = client.unwrap();
@@ -626,7 +624,7 @@ mod tests {
 
     #[test]
     fn test_client_creation_invalid_url() {
-        let result = HomeAssistantClient::new("not a valid url", "test_token");
+        let result = HaClient::new("not a valid url", "test_token");
         assert!(result.is_err());
 
         let err = result.unwrap_err();
@@ -635,7 +633,7 @@ mod tests {
 
     #[test]
     fn test_api_url_building() {
-        let client = HomeAssistantClient::new("http://localhost:8123", "test_token").unwrap();
+        let client = HaClient::new("http://localhost:8123", "test_token").unwrap();
 
         let url = client.api_url("/api/states").unwrap();
         assert_eq!(url.as_str(), "http://localhost:8123/api/states");
@@ -649,7 +647,7 @@ mod tests {
 
     #[test]
     fn test_url_with_trailing_slash() {
-        let client = HomeAssistantClient::new("http://localhost:8123/", "test_token").unwrap();
+        let client = HaClient::new("http://localhost:8123/", "test_token").unwrap();
 
         let url = client.api_url("/api/states").unwrap();
         assert_eq!(url.as_str(), "http://localhost:8123/api/states");

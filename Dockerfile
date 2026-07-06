@@ -11,39 +11,36 @@ ENV OPENSSL_STATIC=1 \
     OPENSSL_NO_VENDOR=1
 
 # -- Cache dependency build --
-# Copy only manifests and create a dummy lib/main so `cargo build` compiles
-# dependencies without the real source. This layer is cached until
-# Cargo.toml or Cargo.lock change.
 COPY Cargo.toml Cargo.lock ./
-COPY mcp/Cargo.toml ./mcp/Cargo.toml
+COPY crates/common/mcp-common/Cargo.toml ./crates/common/mcp-common/Cargo.toml
+COPY crates/homeassistant-mcp/hamcp/Cargo.toml ./crates/homeassistant-mcp/hamcp/Cargo.toml
+COPY crates/homeassistant-mcp/hamcp-server/Cargo.toml ./crates/homeassistant-mcp/hamcp-server/Cargo.toml
 
-RUN mkdir -p mcp/src \
-    && echo 'fn main() {}' > mcp/src/main.rs \
-    && echo '' > mcp/src/lib.rs \
+RUN mkdir -p crates/common/mcp-common/src \
+    && mkdir -p crates/homeassistant-mcp/hamcp/src/models \
+    && mkdir -p crates/homeassistant-mcp/hamcp-server/src \
+    && echo 'fn main() {}' > crates/homeassistant-mcp/hamcp-server/src/main.rs \
+    && echo '' > crates/common/mcp-common/src/lib.rs \
+    && echo '' > crates/homeassistant-mcp/hamcp/src/lib.rs \
     && cargo build --release --locked \
-    && rm -rf mcp/src
+    && rm -rf crates/common/mcp-common/src \
+    && rm -rf crates/homeassistant-mcp/hamcp/src \
+    && rm -rf crates/homeassistant-mcp/hamcp-server/src
 
 # -- Build the real application --
-COPY mcp/src ./mcp/src
+COPY crates ./crates
 
-# Touch main.rs so cargo detects it changed (timestamps may match the dummy)
-RUN touch mcp/src/main.rs mcp/src/lib.rs \
-    && cargo build --release --locked \
-    && strip /app/target/release/mcp
+RUN touch crates/homeassistant-mcp/hamcp-server/src/main.rs \
+    && cargo build --release --locked --bin hamcp-server \
+    && strip /app/target/release/hamcp-server
 
 # ---------- runtime ----------
 FROM scratch
 
-# Bring in CA certificates for HTTPS
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-
-# Copy the statically-linked binary
-COPY --from=builder /app/target/release/mcp /mcp
-
-# Copy Cargo.lock so Trivy can scan Rust dependencies
+COPY --from=builder /app/target/release/hamcp-server /hamcp-server
 COPY --from=builder /app/Cargo.lock /Cargo.lock
 
-# OCI image labels
 LABEL org.opencontainers.image.title="hamcp" \
     org.opencontainers.image.description="MCP server for Home Assistant" \
     org.opencontainers.image.source="https://github.com/mozart409/hamcp-rs" \
@@ -53,4 +50,4 @@ EXPOSE 3000
 
 USER 65532:65532
 
-ENTRYPOINT ["/mcp"]
+ENTRYPOINT ["/hamcp-server"]

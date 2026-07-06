@@ -1,51 +1,42 @@
-//! MCP server for Home Assistant integration.
+//! MCP server tool definitions for Home Assistant.
 //!
-//! This binary provides an MCP (Model Context Protocol) server that exposes
-//! Home Assistant functionality as tools for AI assistants.
+//! This module defines the `HaServer` struct and its MCP tool handlers,
+//! exposing Home Assistant functionality via the Model Context Protocol.
 
 use std::env;
-use std::net::SocketAddr;
-use std::sync::Arc;
 
-use axum::{Json, Router, routing::get};
-use color_eyre::eyre::{Context, Result};
 use rmcp::{
     ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{Implementation, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
-    transport::streamable_http_server::{
-        StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
-    },
 };
 use serde::Serialize;
-use tracing::info;
 
-use mcp::models::inputs::{
+use crate::client::HaClient;
+use crate::models::inputs::{
     CallServiceInput, GetCalendarEventsInput, GetEntityInput, GetHistoryInput, RenderTemplateInput,
     SetStateInput,
 };
-use mcp::rest::HomeAssistantClient;
-
-/// Default server address.
-const DEFAULT_ADDR: &str = "0.0.0.0:3000";
 
 /// MCP server for Home Assistant integration.
 #[derive(Debug, Clone)]
-struct HomeAssistantServer {
+pub struct HaServer {
     /// HTTP client for Home Assistant API.
-    client: HomeAssistantClient,
+    client: HaClient,
     /// Tool router for MCP protocol.
+    #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
 
-impl HomeAssistantServer {
+impl HaServer {
     /// Creates a new Home Assistant MCP server.
     ///
     /// # Arguments
     ///
     /// * `client` - The Home Assistant API client
-    fn new(client: HomeAssistantClient) -> Self {
+    #[must_use]
+    pub fn new(client: HaClient) -> Self {
         Self {
             client,
             tool_router: Self::tool_router(),
@@ -61,7 +52,7 @@ fn to_json<T: Serialize>(value: &T) -> Result<String, String> {
 }
 
 #[tool_router]
-impl HomeAssistantServer {
+impl HaServer {
     /// Checks if the Home Assistant API is running and healthy.
     #[tool(
         name = "health_check",
@@ -153,7 +144,7 @@ impl HomeAssistantServer {
         &self,
         Parameters(input): Parameters<SetStateInput>,
     ) -> Result<String, String> {
-        let state_update = mcp::models::StateUpdate {
+        let state_update = crate::models::StateUpdate {
             state: input.state,
             attributes: input.attributes,
         };
@@ -264,7 +255,7 @@ impl HomeAssistantServer {
 }
 
 #[tool_handler]
-impl ServerHandler for HomeAssistantServer {
+impl ServerHandler for HaServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_protocol_version(rmcp::model::ProtocolVersion::V_2024_11_05)
@@ -273,100 +264,4 @@ impl ServerHandler for HomeAssistantServer {
                 "Home Assistant MCP server for controlling your smart home".to_string(),
             )
     }
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Handle --healthcheck flag for Docker HEALTHCHECK in scratch images.
-    // This avoids the need for curl/wget in the container.
-    if env::args().any(|a| a == "--healthcheck") {
-        return run_healthcheck().await;
-    }
-
-    dotenvy::dotenv().ok();
-
-    color_eyre::install()?;
-
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .init();
-
-    let ha_url = env::var("HA_URL").context("HA_URL environment variable is required")?;
-    let ha_token = env::var("HA_TOKEN").context("HA_TOKEN environment variable is required")?;
-
-    let addr: SocketAddr = env::var("MCP_ADDR")
-        .unwrap_or_else(|_| DEFAULT_ADDR.to_string())
-        .parse()
-        .context("Invalid MCP_ADDR format - expected socket address like 0.0.0.0:3000")?;
-
-    info!("Starting Home Assistant MCP server...");
-    info!("Home Assistant URL: {ha_url}");
-
-    // Create a shared client that will be cloned for each session
-    let client = Arc::new(
-        HomeAssistantClient::new(&ha_url, &ha_token)
-            .context("Failed to create Home Assistant client")?,
-    );
-
-    let service = StreamableHttpService::new(
-        move || {
-            let client = (*client).clone();
-            Ok(HomeAssistantServer::new(client))
-        },
-        LocalSessionManager::default().into(),
-        StreamableHttpServerConfig::default(),
-    );
-
-    let app = Router::new()
-        .nest_service("/mcp", service)
-        .route("/_healthcheck", get(health_handler))
-        .route("/", get(health_handler));
-
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .with_context(|| format!("Failed to bind to {addr}"))?;
-
-    info!("MCP server listening on {addr}");
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            tokio::signal::ctrl_c()
-                .await
-                .expect("Failed to listen for ctrl-c signal");
-        })
-        .await?;
-
-    Ok(())
-}
-
-/// Performs an HTTP health check against the running server.
-///
-/// Used by Docker `HEALTHCHECK` in scratch images where curl/wget are unavailable.
-/// Exits with code 0 on success, 1 on failure.
-async fn run_healthcheck() -> Result<()> {
-    let addr = env::var("MCP_ADDR").unwrap_or_else(|_| DEFAULT_ADDR.to_string());
-    let url = format!("http://{addr}/_healthcheck");
-
-    let response = reqwest::get(&url)
-        .await
-        .with_context(|| format!("Health check request to {url} failed"))?;
-
-    if response.status().is_success() {
-        Ok(())
-    } else {
-        std::process::exit(1);
-    }
-}
-
-/// Health check response body.
-#[derive(Serialize)]
-struct HealthcheckResponse {
-    status: &'static str,
-}
-
-/// Simple health check handler for container probes.
-async fn health_handler() -> Json<HealthcheckResponse> {
-    Json(HealthcheckResponse { status: "ok" })
 }

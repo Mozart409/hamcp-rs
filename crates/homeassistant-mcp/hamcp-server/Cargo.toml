@@ -1,0 +1,15 @@
+[package]
+name = "hamcp-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "hamcp-server"
+path = "src/main.rs"
+
+[dependencies]
+color-eyre = { workspace = true }
+hamcp = { workspace = true }
+mcp-common = { workspace = true }
+tokio = { workspace = true }

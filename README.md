@@ -38,7 +38,7 @@ nix run github:youruser/hamcp-rs
 
 # Or build it
 nix build github:youruser/hamcp-rs
-./result/bin/mcp
+./result/bin/hamcp-server
 ```
 
 ### From source
@@ -49,7 +49,7 @@ nix develop
 
 # Build and run
 cargo build --release
-./target/release/mcp
+./target/release/hamcp-server
 ```
 
 ### Environment Variables
@@ -142,7 +142,7 @@ cargo clippy
 cargo test
 
 # Run the server in dev mode
-cargo run --bin mcp
+cargo run --bin hamcp-server
 
 # Watch mode with bacon
 bacon          # check
@@ -161,10 +161,10 @@ dependency builds separately, so incremental rebuilds are fast.
 
 ```bash
 # Build the binary
-nix build .#mcp
+nix build .#hamcp-server
 
 # Run without building
-nix run .#mcp
+nix run .#hamcp-server
 ```
 
 ### Project Structure
@@ -173,14 +173,13 @@ nix run .#mcp
 hamcp-rs/
 ├── Cargo.toml          # Workspace root
 ├── flake.nix           # Nix flake (dev shell, package, NixOS module)
-├── mcp/                # MCP server crate
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs     # Server entrypoint (streamable HTTP transport)
-│       ├── lib.rs      # Library exports
-│       ├── rest/       # Home Assistant REST API client
-│       ├── websocket/  # Home Assistant WebSocket API client
-│       └── models/     # Data models and MCP tool input types
+├── justfile            # Task runner
+├── crates/
+│   ├── common/
+│   │   └── mcp-common/ # Shared utilities (health checks)
+│   └── homeassistant-mcp/
+│       ├── hamcp/      # Library crate (client, models, server tools)
+│       └── hamcp-server/ # Binary crate (thin wrapper)
 ```
 
 ## License

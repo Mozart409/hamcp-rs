@@ -1,5 +1,31 @@
 [workspace]
 resolver = "3"
 members = [
-    "mcp",
+    "crates/common/mcp-common",
+    "crates/homeassistant-mcp/hamcp",
+    "crates/homeassistant-mcp/hamcp-server",
 ]
+
+[workspace.package]
+version = "0.1.3"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+axum = { version = "0.8.8", features = ["macros"] }
+color-eyre = "0.6.5"
+dotenvy = "0.15.7"
+reqwest = { version = "0.13.2", default-features = false, features = ["json", "rustls"] }
+rmcp = { version = "1.2", features = ["server", "transport-streamable-http-server"] }
+schemars = "1.2.1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+tokio = { version = "1.49.0", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+url = "2.5"
+
+# Local crates
+mcp-common = { path = "crates/common/mcp-common" }
+hamcp = { path = "crates/homeassistant-mcp/hamcp" }

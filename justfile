@@ -4,7 +4,22 @@ set dotenv-load
 
 default:
     just --choose
-    
+
+check:
+    cargo check --all-targets
+
+test:
+    cargo test --all-targets
+
+clippy:
+    cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+
+fmt:
+    cargo fmt
+
+fmt-check:
+    cargo fmt -- --check
+
 inspector: clear
     npx @modelcontextprotocol/inspector --transport http --server-url http://localhost:3000/mcp
 
@@ -28,4 +43,3 @@ dcd: clear
 
 trivy: clear docker-build
     trivy image hamcp:local
-

@@ -1,5 +1,5 @@
 {
-  description = "hamcp-rs - MCP server for Home Assistant";
+  description = "homelab-mcp-servers - MCP servers for homelab services";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -31,8 +31,8 @@
 
       commonArgs = {
         inherit src;
-        pname = "hamcp";
-        version = "0.1.0";
+        pname = "homelab-mcp-servers";
+        version = "0.1.3";
         strictDeps = true;
         buildInputs =
           [pkgs.openssl]
@@ -45,20 +45,19 @@
 
       cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-      mcp = craneLib.buildPackage (commonArgs
+      hamcp-server = craneLib.buildPackage (commonArgs
         // {
           inherit cargoArtifacts;
-          cargoExtraArgs = "--bin mcp";
+          cargoExtraArgs = "--bin hamcp-server";
         });
     in {
       packages = {
-        default = mcp;
-        inherit mcp;
+        default = hamcp-server;
+        inherit hamcp-server;
       };
 
       devShells.default = pkgs.mkShell {
         buildInputs = with pkgs; [
-          # keep-sorted start
           actionlint
           bacon
           cargo-audit
@@ -66,24 +65,16 @@
           cargo-outdated
           cargo-workspaces
           cocogitto
-          dbeaver-bin
           docker
           docker-buildx
           docker-compose
           just
           keep-sorted
-          lazydocker
           lefthook
           nodejs_24
-          opencode
-          opentofu
-          postgresql_16
+          claude-code
           rust
-          sqlx-cli
-          tailwindcss_4
-          trivy
           typos
-          # keep-sorted end
         ];
         shellHook = ''
           lefthook install
@@ -164,7 +155,6 @@
               DynamicUser = true;
               LoadCredential = "ha-token:${cfg.haTokenFile}";
 
-              # Security hardening
               NoNewPrivileges = true;
               ProtectSystem = "strict";
               ProtectHome = true;
@@ -182,7 +172,7 @@
 
             script = ''
               export HA_TOKEN="$(< "$CREDENTIALS_DIRECTORY/ha-token")"
-              exec ${cfg.package}/bin/mcp
+              exec ${cfg.package}/bin/hamcp-server
             '';
           };
 
