@@ -38,4 +38,4 @@ pre-push:
       glob: "*.rs"
       run: cargo clippy -- -W clippy::pedantic
     - name: cog check
-      run: cog check --from-latest-tag
+      run: cog check --ignore-merge-commits $(git describe --tags --abbrev=0)..HEAD
