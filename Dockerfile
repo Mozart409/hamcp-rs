@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- builder ----------
-FROM rust:1.92-alpine3.20 AS builder
+FROM rust:1.96.1-alpine AS builder
 
 WORKDIR /app
 
